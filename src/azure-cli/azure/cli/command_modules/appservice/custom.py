@@ -3491,6 +3491,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
     if vnet or subnet:
         if environment is not None:
             logger.warning("Placeholder warning message")
+            subnet_resource_id = None
         else:
             if plan:
                 if is_valid_resource_id(plan):
