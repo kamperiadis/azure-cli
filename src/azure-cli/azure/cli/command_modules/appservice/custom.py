@@ -3489,30 +3489,33 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
     client = web_client_factory(cmd.cli_ctx)
 
     if vnet or subnet:
-        if plan:
-            if is_valid_resource_id(plan):
-                parse_result = parse_resource_id(plan)
-                plan_info = client.app_service_plans.get(parse_result['resource_group'], parse_result['name'])
-            else:
-                plan_info = client.app_service_plans.get(resource_group_name, plan)
-            webapp_location = plan_info.location
+        if environment is not None:
+            logger.warning("Placeholder warning message")
         else:
-            webapp_location = consumption_plan_location
+            if plan:
+                if is_valid_resource_id(plan):
+                    parse_result = parse_resource_id(plan)
+                    plan_info = client.app_service_plans.get(parse_result['resource_group'], parse_result['name'])
+                else:
+                    plan_info = client.app_service_plans.get(resource_group_name, plan)
+                webapp_location = plan_info.location
+            else:
+                webapp_location = consumption_plan_location
 
-        subnet_info = _get_subnet_info(cmd=cmd,
-                                       resource_group_name=resource_group_name,
-                                       subnet=subnet,
-                                       vnet=vnet)
-        _validate_vnet_integration_location(cmd=cmd, webapp_location=webapp_location,
-                                            subnet_resource_group=subnet_info["resource_group_name"],
-                                            vnet_name=subnet_info["vnet_name"],
-                                            vnet_sub_id=subnet_info["subnet_subscription_id"])
-        _vnet_delegation_check(cmd, subnet_subscription_id=subnet_info["subnet_subscription_id"],
-                               vnet_resource_group=subnet_info["resource_group_name"],
-                               vnet_name=subnet_info["vnet_name"],
-                               subnet_name=subnet_info["subnet_name"])
-        site_config.vnet_route_all_enabled = True
-        subnet_resource_id = subnet_info["subnet_resource_id"]
+            subnet_info = _get_subnet_info(cmd=cmd,
+                                        resource_group_name=resource_group_name,
+                                        subnet=subnet,
+                                        vnet=vnet)
+            _validate_vnet_integration_location(cmd=cmd, webapp_location=webapp_location,
+                                                subnet_resource_group=subnet_info["resource_group_name"],
+                                                vnet_name=subnet_info["vnet_name"],
+                                                vnet_sub_id=subnet_info["subnet_subscription_id"])
+            _vnet_delegation_check(cmd, subnet_subscription_id=subnet_info["subnet_subscription_id"],
+                                vnet_resource_group=subnet_info["resource_group_name"],
+                                vnet_name=subnet_info["vnet_name"],
+                                subnet_name=subnet_info["subnet_name"])
+            site_config.vnet_route_all_enabled = True
+            subnet_resource_id = subnet_info["subnet_resource_id"]
     else:
         subnet_resource_id = None
 
