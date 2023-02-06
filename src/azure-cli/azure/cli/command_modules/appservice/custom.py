@@ -3490,7 +3490,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
 
     if vnet or subnet:
         if environment is not None:
-            logger.warning("Placeholder warning message")
+            logger.warning("This function app is created in an App Environment. Go to App environment to configure Networking")
             subnet_resource_id = None
         else:
             if plan:
