@@ -49,7 +49,7 @@ from azure.cli.core.profiles import ResourceType, get_sdk
 from azure.cli.core.azclierror import (InvalidArgumentValueError, MutuallyExclusiveArgumentError, ResourceNotFoundError,
                                        RequiredArgumentMissingError, ValidationError, CLIInternalError,
                                        UnclassifiedUserFault, AzureResponseError, AzureInternalError,
-                                       ArgumentUsageError, FileOperationError)
+                                       ArgumentUsageError, FileOperationError, UnsupportOperationError)
 
 from .tunnel import TunnelServer
 
@@ -3500,6 +3500,9 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
     client = web_client_factory(cmd.cli_ctx)
 
     if vnet or subnet:
+        if environment is not None:
+            raise ArgumentUsageError('vnet paramter and managed environment parameter canot be passed in at the same time', 
+            'This function app is created in an App Environment. Go to App environment to configure Networking')
         if plan:
             if is_valid_resource_id(plan):
                 parse_result = parse_resource_id(plan)
@@ -4139,6 +4142,8 @@ def remove_hc(cmd, resource_group_name, name, namespace, hybrid_connection, slot
                                                                   hybrid_connection, slot)
     return return_hc
 
+def list_functionapp_vnet_integration(cmd, name, resource_group_name, slot=None):
+    return list_vnet_integration(cmd, name, resource_group_name, slot=None)
 
 def list_vnet_integration(cmd, name, resource_group_name, slot=None):
     client = web_client_factory(cmd.cli_ctx)
@@ -4317,6 +4322,8 @@ def _validate_subnet(cli_ctx, subnet, vnet, resource_group_name):
         child_type_1='subnets',
         child_name_1=subnet)
 
+def remove_functionapp_vnet_integration(cmd, name, resource_group_name, slot=None):
+    return remove_vnet_integration(cmd, name, resource_group_name, slot)
 
 def remove_vnet_integration(cmd, name, resource_group_name, slot=None):
     client = web_client_factory(cmd.cli_ctx)
