@@ -15,7 +15,7 @@ from azure.cli.testsdk.scenario_tests import AllowLargeResponse, record_only
 from azure.cli.testsdk import (ScenarioTest, LocalContextScenarioTest, LiveScenarioTest, ResourceGroupPreparer,
                                StorageAccountPreparer, JMESPathCheck, live_only)
 from azure.cli.testsdk.checkers import JMESPathCheckNotExists, JMESPathPatternCheck
-from azure.cli.core.azclierror import ResourceNotFoundError, ValidationError, ArgumentUsageError
+from azure.cli.core.azclierror import ResourceNotFoundError, ValidationError, ArgumentUsageError, UnsupportOperationError
 
 TEST_DIR = os.path.abspath(os.path.join(os.path.abspath(__file__), '..'))
 
@@ -631,8 +631,10 @@ class FunctionAppManagedEnvironment(LiveScenarioTest):
                      JMESPathCheck('name', functionapp_name),
                      JMESPathCheck('hostNames[0]', functionapp_name + '.azurewebsites.net')])
 
-        self.cmd('functionapp vnet-integration add -g {} -n {} --vnet {} --subnet {}'.format(
-            resource_group, functionapp_name, vnet_name, subnet_name), expect_failure=True)
+
+        with self.assertRaises(ArgumentUsageError):
+            self.cmd('functionapp vnet-integration add -g {} -n {} --vnet {} --subnet {}'
+            .format(resource_group, functionapp_name, vnet_name, subnet_name))
 
     @ResourceGroupPreparer(location=WINDOWS_ASP_LOCATION_FUNCTIONAPP)
     @StorageAccountPreparer()
@@ -659,9 +661,9 @@ class FunctionAppManagedEnvironment(LiveScenarioTest):
                      JMESPathCheck('state', 'Running'),
                      JMESPathCheck('name', functionapp_name),
                      JMESPathCheck('hostNames[0]', functionapp_name + '.azurewebsites.net')])
-
-        self.cmd('functionapp vnet-integration remove -g {} -n {}'.format(
-            resource_group, functionapp_name), expect_failure=True)
+        with self.assertRaises(UnsupportOperationError):
+            self.cmd('functionapp vnet-integration remove -g {} -n {}'.format(
+                resource_group, functionapp_name), expect_failure=True)
 
     @ResourceGroupPreparer(location=WINDOWS_ASP_LOCATION_FUNCTIONAPP)
     @StorageAccountPreparer()
@@ -689,8 +691,9 @@ class FunctionAppManagedEnvironment(LiveScenarioTest):
                      JMESPathCheck('name', functionapp_name),
                      JMESPathCheck('hostNames[0]', functionapp_name + '.azurewebsites.net')])
 
-        self.cmd('functionapp vnet-integration list -g {} -n {}'.format(
-            resource_group, functionapp_name), expect_failure=True)
+        with self.assertRaises(UnsupportOperationError):
+            self.cmd('functionapp vnet-integration list -g {} -n {}'.format(
+                resource_group, functionapp_name), expect_failure=True)
 
 class FunctionAppOnWindowsWithRuntime(ScenarioTest):
     @ResourceGroupPreparer(location=WINDOWS_ASP_LOCATION_FUNCTIONAPP)
