@@ -128,6 +128,10 @@ def validate_app_exists(cmd, namespace):
     if not app:
         raise ResourceNotFoundError("'{}' app not found in ResourceGroup '{}'".format(app, resource_group_name))
 
+def validate_functionapp_on_containerapp_vnet_add(cmd, namespace):
+    validate_functionapp_on_containerapp_vnet(cmd, namespace)
+    validate_add_vnet(cmd, namespace)
+
 def validate_functionapp_on_containerapp_vnet(cmd, namespace):
     resource_group_name = namespace.resource_group_name
     name = namespace.name
