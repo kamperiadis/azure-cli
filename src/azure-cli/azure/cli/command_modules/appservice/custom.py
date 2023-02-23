@@ -3500,6 +3500,9 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
     client = web_client_factory(cmd.cli_ctx)
 
     if vnet or subnet:
+        if environment is not None:
+            raise ArgumentUsageError('vnet paramter and managed environment parameter canot be passed in at the same time', 
+            'This function app is created in an App Environment. Go to App environment to configure Networking')
         if plan:
             if is_valid_resource_id(plan):
                 parse_result = parse_resource_id(plan)
