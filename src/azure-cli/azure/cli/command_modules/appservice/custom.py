@@ -3578,8 +3578,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
     if environment is None and bool(plan) == bool(consumption_plan_location):
         raise MutuallyExclusiveArgumentError("usage error: You must specify one of these parameter "
                                              "--plan NAME_OR_ID | --consumption-plan-location LOCATION")
-    from azure.mgmt.web.models import Site
-    SiteConfig, NameValuePair = cmd.get_models('SiteConfig', 'NameValuePair')
+    from azure.mgmt.web.models import Site, SiteConfig, NameValuePair
     disable_app_insights = (disable_app_insights == "true")
 
     site_config = SiteConfig(app_settings=[])
@@ -3667,7 +3666,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
 
         managed_environment = get_managed_environment(cmd, resource_group_name, environment)
 
-        location = managed_environment.location
+        location = 'eastasia(stage)'
         functionapp_def.location = location
         is_linux = True
 
@@ -3735,12 +3734,24 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
         functionapp_def.kind = 'functionapp'
         functionapp_def.reserved = None
         functionapp_def.name = name
+        functionapp_def.https_only = None
+        functionapp_def.scm_site_also_stopped = None
+        functionapp_def.hyper_v = None
+        functionapp_def.is_xenon = None
 
         site_config.net_framework_version = None
         site_config.java_version = None
         site_config.use32_bit_worker_process = None
         site_config.power_shell_version = None
         site_config.linux_fx_version = '{}|{}'.format('DOCKER', image)
+        site_config.http20_enabled = None
+        site_config.local_my_sql_enabled = None
+
+        functionapp_def.enable_additional_properties_sending()
+        existing_properties = functionapp_def.serialize()["properties"]
+        functionapp_def.additional_properties["properties"] = existing_properties
+        functionapp_def.additional_properties["properties"]["defaultHostNameScope"] = 0
+        functionapp_def.additional_properties["properties"]["name"] = name
 
     # temporary workaround for dotnet-isolated linux consumption apps
     if is_linux and consumption_plan_location is not None and runtime == 'dotnet-isolated':
