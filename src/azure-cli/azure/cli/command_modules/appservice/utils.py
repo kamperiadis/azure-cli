@@ -174,7 +174,11 @@ def show_raw_functionapp(cmd, resource_group_name, name):
 
 def is_centauri_functionapp(cmd, resource_group, name):
     function_app = show_raw_functionapp(cmd, resource_group, name)
-    return function_app["properties"]["managedEnvironmentId"] is not None
+    try:
+        managedEnvironmentId = function_app["properties"]["managedEnvironmentId"]
+    except Exception as ex:
+        return False
+    return managedEnvironmentId is not None
 
 
 def _list_app(cli_ctx, resource_group_name=None):
