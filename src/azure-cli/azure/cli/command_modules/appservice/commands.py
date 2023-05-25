@@ -365,7 +365,7 @@ def load_command_table(self, _):
 
     with self.command_group('functionapp deployment source') as g:
         g.custom_command('config-local-git', 'enable_local_git', validator=validate_functionapp_on_flex_plan)
-        g.custom_command('config-zip', 'enable_zip_deploy_functionapp')
+        g.custom_command('config-zip', 'get_scm_site_headers_flex')
         g.custom_command('config', 'config_source_control', exception_handler=ex_handler_factory(), validator=validate_functionapp_on_flex_plan)
         g.custom_command('sync', 'sync_site_repo', exception_handler=ex_handler_factory(), validator=validate_functionapp_on_flex_plan)
         g.custom_show_command('show', 'show_source_control', exception_handler=ex_handler_factory(), validator=validate_functionapp_on_flex_plan)

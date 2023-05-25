@@ -2926,19 +2926,20 @@ def get_scm_site_headers(cli_ctx, name, resource_group_name, slot=None, addition
     return headers
 
 #For cv2 only use aad token
-def get_scm_site_headers_flex(cli_ctx, name, resource_group_name, slot=None, additional_headers=None):
+def get_scm_site_headers_flex(cmd):
     import urllib3
 
     logger.info("[AUTH]: AAD")
     headers = urllib3.util.make_headers()
-    headers["Authorization"] = f"Bearer {get_bearer_token(cli_ctx)}"
+    headers["Authorization"] = f"Bearer {get_bearer_token(cmd.cli_ctx)}"
     print(headers["Authorization"])
     headers['User-Agent'] = get_az_user_agent()
-    headers['x-ms-client-request-id'] = cli_ctx.data['headers']['x-ms-client-request-id']
-    # allow setting Content-Type, Cache-Control, etc. headers
-    if additional_headers:
-        for k, v in additional_headers.items():
-            headers[k] = v
+    headers['x-ms-client-request-id'] = cmd.cli_ctx.data['headers']['x-ms-client-request-id']
+    print(headers['Authorization'])
+    # # allow setting Content-Type, Cache-Control, etc. headers
+    # if additional_headers:
+    #     for k, v in additional_headers.items():
+    #         headers[k] = v
 
     return headers
 
