@@ -2710,7 +2710,10 @@ def import_zone(cmd, resource_group_name, zone_name, file_name):
         rs_name = rs_name[:-(len(origin) + 1)] if rs_name != origin else '@'
         try:
             record_count = len(rs[_type_to_property_name(rs_type)[0]])
-        except TypeError:
+        except (TypeError, KeyError):
+            # There is some bug with `alias records` being mapped from `AZURE ALIAS A` to `ARecords`,
+            # but `rs` does not contain `a_records`.  We could fix it, but this is just logging, so
+            # lets not fail the whole import and hope someone refactors this method
             record_count = 1
         total_records += record_count
     cum_records = 0
@@ -2729,7 +2732,7 @@ def import_zone(cmd, resource_group_name, zone_name, file_name):
 
         try:
             record_count = len(rs[_type_to_property_name(rs_type)[0]])
-        except TypeError:
+        except (TypeError, KeyError):
             record_count = 1
         if rs_name == '@' and rs_type == 'soa':
             root_soa = client.record_sets.get(resource_group_name, zone_name, '@', 'SOA')
@@ -4518,28 +4521,8 @@ def add_nic_ip_config_address_pool(cmd, resource_group_name, network_interface_n
 
 def remove_nic_ip_config_address_pool(cmd, resource_group_name, network_interface_name, ip_config_name,
                                       backend_address_pool, load_balancer_name=None, application_gateway_name=None):
-    from .aaz.latest.network.nic.ip_config.lb_pool import Remove as _LBPoolRemove
-    from .aaz.latest.network.nic.ip_config.ag_pool import Remove as _AGPoolRemove
-
-    class LBPoolRemove(_LBPoolRemove):
-        def _handler(self, command_args):
-            lro_poller = super()._handler(command_args)
-            lro_poller._result_callback = self._output
-            return lro_poller
-
-        def _output(self, *args, **kwargs):
-            result = self.deserialize_output(self.ctx.vars.instance, client_flatten=True)
-            return result["ipConfigurations"][0]
-
-    class AGPoolRemove(_AGPoolRemove):
-        def _handler(self, command_args):
-            lro_poller = super()._handler(command_args)
-            lro_poller._result_callback = self._output
-            return lro_poller
-
-        def _output(self, *args, **kwargs):
-            result = self.deserialize_output(self.ctx.vars.instance, client_flatten=True)
-            return result["ipConfigurations"][0]
+    from .aaz.latest.network.nic.ip_config.lb_pool import Remove as LBPoolRemove
+    from .aaz.latest.network.nic.ip_config.ag_pool import Remove as AGPoolRemove
 
     arguments = {
         "ip_config_name": ip_config_name,
@@ -4574,10 +4557,6 @@ class NICIPConfigNATAdd(_NICIPConfigNATAdd):
 
 
 class NICIPConfigNATRemove(_NICIPConfigNATRemove):
-    def _handler(self, command_args):
-        lro_poller = super()._handler(command_args)
-        lro_poller._result_callback = self._output
-        return lro_poller
 
     @classmethod
     def _build_arguments_schema(cls, *args, **kwargs):
@@ -4592,10 +4571,6 @@ class NICIPConfigNATRemove(_NICIPConfigNATRemove):
                      "/loadBalancers/{lb_name}/inboundNatRules/{}",
         )
         return args_schema
-
-    def _output(self, *args, **kwargs):
-        result = self.deserialize_output(self.ctx.vars.instance, client_flatten=True)
-        return result["ipConfigurations"][0]
 # endregion
 
 
@@ -5180,8 +5155,6 @@ def create_traffic_manager_profile(cmd, traffic_manager_profile_name, resource_g
                                    ttl=30, tags=None, interval=None, timeout=None, max_failures=None,
                                    monitor_custom_headers=None, status_code_ranges=None, max_return=None):
     from .aaz.latest.network.traffic_manager.profile import Create
-    Create_Profile = Create(cmd.loader)
-
     if monitor_path is None and monitor_protocol == 'HTTP':
         monitor_path = '/'
     args = {
@@ -5204,7 +5177,7 @@ def create_traffic_manager_profile(cmd, traffic_manager_profile_name, resource_g
         "max_failures": max_failures
     }
 
-    return Create_Profile(args)
+    return Create(cli_ctx=cmd.cli_ctx)(command_args=args)
 
 
 def update_traffic_manager_profile(cmd, traffic_manager_profile_name, resource_group_name,
@@ -5213,8 +5186,6 @@ def update_traffic_manager_profile(cmd, traffic_manager_profile_name, resource_g
                                    ttl=None, timeout=None, interval=None, max_failures=None,
                                    monitor_custom_headers=None, status_code_ranges=None, max_return=None):
     from .aaz.latest.network.traffic_manager.profile import Update
-    Update_Profile = Update(cmd.loader)
-
     args = {
         "name": traffic_manager_profile_name,
         "resource_group": resource_group_name
@@ -5246,7 +5217,7 @@ def update_traffic_manager_profile(cmd, traffic_manager_profile_name, resource_g
     if max_failures is not None:
         args["max_failures"] = max_failures
 
-    return Update_Profile(args)
+    return Update(cli_ctx=cmd.cli_ctx)(command_args=args)
 
 
 def create_traffic_manager_endpoint(cmd, resource_group_name, profile_name, endpoint_type, endpoint_name,
@@ -5256,8 +5227,6 @@ def create_traffic_manager_endpoint(cmd, resource_group_name, profile_name, endp
                                     min_child_endpoints=None, min_child_ipv4=None, min_child_ipv6=None,
                                     geo_mapping=None, monitor_custom_headers=None, subnets=None, always_serve=None):
     from .aaz.latest.network.traffic_manager.endpoint import Create
-    Create_Endpoint = Create(cmd.loader)
-
     args = {
         "name": endpoint_name,
         "type": endpoint_type,
@@ -5279,7 +5248,7 @@ def create_traffic_manager_endpoint(cmd, resource_group_name, profile_name, endp
         "always_serve": always_serve,
     }
 
-    return Create_Endpoint(args)
+    return Create(cli_ctx=cmd.cli_ctx)(command_args=args)
 
 
 def update_traffic_manager_endpoint(cmd, resource_group_name, profile_name, endpoint_name,
@@ -5290,8 +5259,6 @@ def update_traffic_manager_endpoint(cmd, resource_group_name, profile_name, endp
                                     min_child_ipv6=None, geo_mapping=None,
                                     subnets=None, monitor_custom_headers=None, always_serve=None):
     from .aaz.latest.network.traffic_manager.endpoint import Update
-    Update_Endpoint = Update(cmd.loader)
-
     args = {
         "name": endpoint_name,
         "type": endpoint_type,
@@ -5327,20 +5294,17 @@ def update_traffic_manager_endpoint(cmd, resource_group_name, profile_name, endp
     if always_serve is not None:
         args["always_serve"] = always_serve
 
-    return Update_Endpoint(args)
+    return Update(cli_ctx=cmd.cli_ctx)(command_args=args)
 
 
 def list_traffic_manager_endpoints(cmd, resource_group_name, profile_name, endpoint_type=None):
     from .aaz.latest.network.traffic_manager.profile import Show
-    Show_Profile = Show(cmd.loader)
-
-    args = {
+    profile = Show(cli_ctx=cmd.cli_ctx)(command_args={
+        "profile_name": profile_name,
         "resource_group": resource_group_name,
-        "profile_name": profile_name
-    }
-    profile = Show_Profile(args)
+    })
 
-    return [e for e in profile['endpoints'] if not endpoint_type or e['type'].endswith(endpoint_type)]
+    return [endpoint for endpoint in profile["endpoints"] if not endpoint_type or endpoint["type"].endswith(endpoint_type)]
 # endregion
 
 
@@ -5718,8 +5682,7 @@ def sync_vnet_peering(cmd, resource_group_name, virtual_network_name, virtual_ne
         err_msg = f"Virtual network peering {virtual_network_name} doesn't exist."
         raise ResourceNotFoundError(err_msg)
 
-    from .aaz.latest.network.vnet.peering import Create
-    return Create(cli_ctx=cmd.cli_ctx)(command_args={
+    return VNetPeeringCreate(cli_ctx=cmd.cli_ctx)(command_args={
         "name": virtual_network_peering_name,
         "resource_group": resource_group_name,
         "vnet_name": virtual_network_name,
