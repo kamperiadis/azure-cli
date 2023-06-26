@@ -623,7 +623,7 @@ def enable_zip_deploy_flex(cmd, resource_group_name, name, src, timeout=None, sl
     # check the status of async deployment
     if res.status_code == 202:
         response = _check_zip_deployment_status(cmd, resource_group_name, name, deployment_status_url,
-                                                headers, timeout)
+                                                slot, timeout)
         return response
 
     # check if there's an ongoing process
