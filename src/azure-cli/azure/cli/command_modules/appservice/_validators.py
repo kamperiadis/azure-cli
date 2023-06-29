@@ -421,7 +421,7 @@ def validate_vnet_integration(cmd, namespace):
         if is_valid_resource_id(namespace.plan):
             parse_result = parse_resource_id(namespace.plan)
             plan_info = client.app_service_plans.get(parse_result['resource_group'], parse_result['name'])
-        elif namespace.flexconsumption_location:
+        elif _get_flexconsumption_location(namespace):
             return
         else:
             plan_info = client.app_service_plans.get(name=namespace.plan,
@@ -495,6 +495,12 @@ def _get_app_name(namespace):
 def _get_environment(namespace):
     if hasattr(namespace, "environment"):
         return namespace.environment
+    return None
+
+
+def _get_flexconsumption_location(namespace):
+    if hasattr(namespace, "flexconsumption_location"):
+        return namespace.flexconsumption_location
     return None
 
 
