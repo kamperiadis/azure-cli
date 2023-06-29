@@ -66,6 +66,7 @@ from .utils import (_normalize_sku,
                     _rename_server_farm_props,
                     _get_location_from_webapp,
                     _normalize_location,
+                    _normalize_stage_location,
                     get_pool_manager, use_additional_properties, get_app_service_plan_from_webapp,
                     get_resource_if_exists, repo_url_to_name, get_token,
                     app_service_plan_exists, is_centauri_functionapp, is_flex_functionapp,
@@ -301,7 +302,11 @@ def _validate_vnet_integration_location(cmd, subnet_resource_group, vnet_name, w
 
     vnet_location = _normalize_location(cmd, vnet_location)
     asp_location = _normalize_location(cmd, webapp_location)
-    if vnet_location != asp_location:
+
+    nonstage_vnet_loc = _normalize_stage_location(vnet_location)
+    nonstage_asp_loc = _normalize_stage_location(asp_location)
+
+    if nonstage_vnet_loc != nonstage_asp_loc:
         raise ArgumentUsageError("Unable to create webapp: vnet and App Service Plan must be in the same location. "
                                  "vnet location: {}. Plan location: {}.".format(vnet_location, asp_location))
 
@@ -3862,6 +3867,8 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
             else:
                 plan_info = client.app_service_plans.get(resource_group_name, plan)
             webapp_location = plan_info.location
+        elif flexconsumption_location:
+            webapp_location = flexconsumption_location
         else:
             webapp_location = consumption_plan_location
 
