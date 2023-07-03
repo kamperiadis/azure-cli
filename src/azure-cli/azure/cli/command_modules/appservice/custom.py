@@ -291,18 +291,18 @@ def _validate_vnet_integration_location(cmd, subnet_resource_group, vnet_name, w
     if vnet_sub_id:
         cmd.cli_ctx.data['subscription_id'] = vnet_sub_id
 
-    vnet_location = VNetShow(cli_ctx=cmd.cli_ctx)(command_args={
-        "name": vnet_name,
-        "resource_group": subnet_resource_group
-    })["location"]
+    # vnet_location = VNetShow(cli_ctx=cmd.cli_ctx)(command_args={
+    #     "name": vnet_name,
+    #     "resource_group": subnet_resource_group
+    # })["location"]
 
-    cmd.cli_ctx.data['subscription_id'] = current_sub_id
+    # cmd.cli_ctx.data['subscription_id'] = current_sub_id
 
-    vnet_location = _normalize_location(cmd, vnet_location)
-    asp_location = _normalize_location(cmd, webapp_location)
-    if vnet_location != asp_location:
-        raise ArgumentUsageError("Unable to create webapp: vnet and App Service Plan must be in the same location. "
-                                 "vnet location: {}. Plan location: {}.".format(vnet_location, asp_location))
+    # vnet_location = _normalize_location(cmd, vnet_location)
+    # asp_location = _normalize_location(cmd, webapp_location)
+    # if vnet_location != asp_location:
+    #     raise ArgumentUsageError("Unable to create webapp: vnet and App Service Plan must be in the same location. "
+    #                              "vnet location: {}. Plan location: {}.".format(vnet_location, asp_location))
 
 
 def _get_subnet_info(cmd, resource_group_name, vnet, subnet):
@@ -3902,6 +3902,8 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
             else:
                 plan_info = client.app_service_plans.get(resource_group_name, plan)
             webapp_location = plan_info.location
+        elif flexconsumption_location:
+            webapp_location = flexconsumption_location
         else:
             webapp_location = consumption_plan_location
 
@@ -3909,14 +3911,14 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                                        resource_group_name=resource_group_name,
                                        subnet=subnet,
                                        vnet=vnet)
-        _validate_vnet_integration_location(cmd=cmd, webapp_location=webapp_location,
-                                            subnet_resource_group=subnet_info["resource_group_name"],
-                                            vnet_name=subnet_info["vnet_name"],
-                                            vnet_sub_id=subnet_info["subnet_subscription_id"])
-        _vnet_delegation_check(cmd, subnet_subscription_id=subnet_info["subnet_subscription_id"],
-                               vnet_resource_group=subnet_info["resource_group_name"],
-                               vnet_name=subnet_info["vnet_name"],
-                               subnet_name=subnet_info["subnet_name"])
+        # _validate_vnet_integration_location(cmd=cmd, webapp_location=webapp_location,
+        #                                     subnet_resource_group=subnet_info["resource_group_name"],
+        #                                     vnet_name=subnet_info["vnet_name"],
+        #                                     vnet_sub_id=subnet_info["subnet_subscription_id"])
+        # _vnet_delegation_check(cmd, subnet_subscription_id=subnet_info["subnet_subscription_id"],
+        #                        vnet_resource_group=subnet_info["resource_group_name"],
+        #                        vnet_name=subnet_info["vnet_name"],
+        #                        subnet_name=subnet_info["subnet_name"])
         subnet_resource_id = subnet_info["subnet_resource_id"]
         vnet_route_all_enabled = True
     else:
@@ -4722,7 +4724,9 @@ def add_functionapp_vnet_integration(cmd, name, resource_group_name, vnet, subne
     client = web_client_factory(cmd.cli_ctx)
     functionapp = get_functionapp(cmd, resource_group_name, name)
     parsed_plan_id = parse_resource_id(functionapp.server_farm_id)
-    plan_info = client.app_service_plans.get(parsed_plan_id['resource_group'], parsed_plan_id['name'])
+    params = {}
+    params['stamp'] = STAMP_NAME 
+    plan_info = client.app_service_plans.get(parsed_plan_id['resource_group'], parsed_plan_id['name'], api_version='2022-03-01-privatepreview', params=params)
     if plan_info is None:
         raise ResourceNotFoundError('Could not determine the current plan of the functionapp')
     if is_plan_consumption(cmd, plan_info):
@@ -4740,7 +4744,9 @@ def _add_vnet_integration(cmd, name, resource_group_name, vnet, subnet, slot=Non
     app = _generic_site_operation(cmd.cli_ctx, resource_group_name, name, 'get', slot, client=client)
 
     parsed_plan = parse_resource_id(app.server_farm_id)
-    plan_info = client.app_service_plans.get(parsed_plan['resource_group'], parsed_plan["name"])
+    params = {}
+    params['stamp'] = STAMP_NAME
+    plan_info = client.app_service_plans.get(parsed_plan['resource_group'], parsed_plan["name"], api_version='2022-03-01-privatepreview', params=params)
 
     if skip_delegation_check:
         logger.warning('Skipping delegation check. Ensure that subnet is delegated to Microsoft.Web/serverFarms.'
@@ -4753,6 +4759,7 @@ def _add_vnet_integration(cmd, name, resource_group_name, vnet, subnet, slot=Non
 
     app.virtual_network_subnet_id = subnet_info["subnet_resource_id"]
     app.vnet_route_all_enabled = True
+    app.site_config.vnet_route_all_enabled = True
 
     _generic_site_operation(cmd.cli_ctx, resource_group_name, name, 'begin_create_or_update', slot,
                             client=client, extra_parameter=app)
@@ -4859,9 +4866,11 @@ def remove_functionapp_vnet_integration(cmd, name, resource_group_name, slot=Non
 
 
 def remove_vnet_integration(cmd, name, resource_group_name, slot=None):
+    params = {}
+    params['stamp'] = STAMP_NAME
     client = web_client_factory(cmd.cli_ctx)
     if slot is None:
-        return_vnet = client.web_apps.delete_swift_virtual_network(resource_group_name, name)
+        return_vnet = client.web_apps.delete_swift_virtual_network(resource_group_name, name, params = params, api_version = '2022-03-01-privatepreview')
     else:
         return_vnet = client.web_apps.delete_swift_virtual_network_slot(resource_group_name, name, slot)
     return return_vnet

@@ -199,52 +199,52 @@ def validate_functionapp_on_containerapp_vnet(cmd, namespace):
 def validate_add_vnet(cmd, namespace):
     from azure.core.exceptions import ResourceNotFoundError as ResNotFoundError
 
-    resource_group_name = namespace.resource_group_name
-    vnet_identifier = namespace.vnet
-    name = namespace.name
-    slot = namespace.slot
+    # resource_group_name = namespace.resource_group_name
+    # vnet_identifier = namespace.vnet
+    # name = namespace.name
+    # slot = namespace.slot
 
-    if is_valid_resource_id(vnet_identifier):
-        current_sub_id = get_subscription_id(cmd.cli_ctx)
-        parsed_vnet = parse_resource_id(vnet_identifier)
+    # if is_valid_resource_id(vnet_identifier):
+    #     current_sub_id = get_subscription_id(cmd.cli_ctx)
+    #     parsed_vnet = parse_resource_id(vnet_identifier)
 
-        vnet_sub_id = parsed_vnet['subscription']
-        vnet_group = parsed_vnet['resource_group']
-        vnet_name = parsed_vnet['name']
+    #     vnet_sub_id = parsed_vnet['subscription']
+    #     vnet_group = parsed_vnet['resource_group']
+    #     vnet_name = parsed_vnet['name']
 
-        cmd.cli_ctx.data['subscription_id'] = vnet_sub_id
-        vnet_loc = VNetShow(cli_ctx=cmd.cli_ctx)(command_args={
-            "name": vnet_name,
-            "resource_group": vnet_group
-        })["location"]
-        cmd.cli_ctx.data['subscription_id'] = current_sub_id
-    else:
-        try:
-            vnet_loc = VNetShow(cli_ctx=cmd.cli_ctx)(command_args={
-                "name": vnet_identifier,
-                "resource_group": namespace.resource_group_name
-            })["location"]
-        except ResNotFoundError:
-            vnets = VNetList(cli_ctx=cmd.cli_ctx)(command_args={})
-            vnet_loc = ''
-            for v in vnets:
-                if vnet_identifier == v["name"]:
-                    vnet_loc = v["location"]
-                    break
+    #     cmd.cli_ctx.data['subscription_id'] = vnet_sub_id
+    #     vnet_loc = VNetShow(cli_ctx=cmd.cli_ctx)(command_args={
+    #         "name": vnet_name,
+    #         "resource_group": vnet_group
+    #     })["location"]
+    #     cmd.cli_ctx.data['subscription_id'] = current_sub_id
+    # else:
+    #     try:
+    #         vnet_loc = VNetShow(cli_ctx=cmd.cli_ctx)(command_args={
+    #             "name": vnet_identifier,
+    #             "resource_group": namespace.resource_group_name
+    #         })["location"]
+    #     except ResNotFoundError:
+    #         vnets = VNetList(cli_ctx=cmd.cli_ctx)(command_args={})
+    #         vnet_loc = ''
+    #         for v in vnets:
+    #             if vnet_identifier == v["name"]:
+    #                 vnet_loc = v["location"]
+    #                 break
 
-    if not vnet_loc:
-        # Fall back to back end validation
-        logger.warning("Failed to fetch vnet. Skipping location validation.")
-        return
+    # if not vnet_loc:
+    #     # Fall back to back end validation
+    #     logger.warning("Failed to fetch vnet. Skipping location validation.")
+    #     return
 
-    webapp = _generic_site_operation(cmd.cli_ctx, resource_group_name, name, 'get', slot)
+    # webapp = _generic_site_operation(cmd.cli_ctx, resource_group_name, name, 'get', slot)
 
-    webapp_loc = _normalize_location(cmd, webapp.location)
-    vnet_loc = _normalize_location(cmd, vnet_loc)
+    # webapp_loc = _normalize_location(cmd, webapp.location)
+    # vnet_loc = _normalize_location(cmd, vnet_loc)
 
-    if vnet_loc != webapp_loc:
-        raise ValidationError("The app and the vnet resources are in different locations. "
-                              "Cannot integrate a regional VNET to an app in a different region")
+    # if vnet_loc != webapp_loc:
+    #     raise ValidationError("The app and the vnet resources are in different locations. "
+    #                           "Cannot integrate a regional VNET to an app in a different region")
 
 
 def validate_front_end_scale_factor(namespace):
@@ -417,6 +417,8 @@ def validate_vnet_integration(cmd, namespace):
         if is_valid_resource_id(namespace.plan):
             parse_result = parse_resource_id(namespace.plan)
             plan_info = client.app_service_plans.get(parse_result['resource_group'], parse_result['name'])
+        elif _get_flexconsumption_location(namespace):
+            return
         else:
             plan_info = client.app_service_plans.get(name=namespace.plan,
                                                      resource_group_name=namespace.resource_group_name)
@@ -428,6 +430,12 @@ def validate_vnet_integration(cmd, namespace):
                                      "Plan sku cannot be one of: {}. "
                                      "Please run 'az appservice plan create -h' "
                                      "to see all available App Service Plan SKUs ".format(sku_name, disallowed_skus))
+
+
+def _get_flexconsumption_location(namespace):
+    if hasattr(namespace, "flexconsumption_location"):
+        return namespace.flexconsumption_location
+    return None
 
 
 def _validate_ase_exists(client, ase_name, ase_rg):
