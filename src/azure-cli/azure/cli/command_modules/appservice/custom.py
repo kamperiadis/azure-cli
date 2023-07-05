@@ -3614,7 +3614,9 @@ class _FunctionAppStackRuntimeHelper(_AbstractStackRuntimeHelper):
                               "Run 'az functionapp list-runtimes' for more details on supported runtimes. ")
 
     def _get_raw_stacks_from_api(self):
-        return list(self._client.provider.get_function_app_stacks(stack_os_type=None))
+        params = {}
+        params['stamp'] = STAMP_NAME
+        return list(self._client.provider.get_function_app_stacks(stack_os_type=None, params=params, api_version='2022-03-01-privatepreview'))
 
     # remove non-digit or non-"." chars
     @classmethod
@@ -4019,18 +4021,12 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                                   "Supported version for runtime {1} is {2}."
                                   .format(runtime_version, runtime, lang['version']))
 
-        site_config_dict = SiteConfigPropertiesDictionary()
-        for prop, value in lang['site_config'].items():
-            setattr(site_config_dict, prop, value)
-        app_settings_dict = lang['app_settings']
+    runtime_helper = _FunctionAppStackRuntimeHelper(cmd, linux=is_linux, windows=(not is_linux))
+    matched_runtime = runtime_helper.resolve("dotnet" if not runtime else runtime,
+                                                runtime_version, functions_version, is_linux)
 
-    else:
-        runtime_helper = _FunctionAppStackRuntimeHelper(cmd, linux=is_linux, windows=(not is_linux))
-        matched_runtime = runtime_helper.resolve("dotnet" if not runtime else runtime,
-                                                 runtime_version, functions_version, is_linux)
-
-        site_config_dict = matched_runtime.site_config_dict
-        app_settings_dict = matched_runtime.app_settings_dict
+    site_config_dict = matched_runtime.site_config_dict
+    app_settings_dict = matched_runtime.app_settings_dict
 
     con_string = "test"
 
@@ -4160,26 +4156,26 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
         site_config.app_settings.append(NameValuePair(name='WEBSITE_CONTENTSHARE', value=_get_content_share_name(name)))
 
     create_app_insights = False
+    if app_insights_key is not None:
+        site_config.app_settings.append(NameValuePair(name='APPINSIGHTS_INSTRUMENTATIONKEY',
+                                                        value=app_insights_key))
+    elif app_insights is not None:
+        instrumentation_key = get_app_insights_key(cmd.cli_ctx, resource_group_name, app_insights)
+        site_config.app_settings.append(NameValuePair(name='APPINSIGHTS_INSTRUMENTATIONKEY',
+                                                        value=instrumentation_key))
+    elif disable_app_insights or not matched_runtime.app_insights:
+        # set up dashboard if no app insights
+        site_config.app_settings.append(NameValuePair(name='AzureWebJobsDashboard', value=con_string))
+    elif not disable_app_insights and matched_runtime.app_insights:
+        create_app_insights = True
 
-    if flexconsumption_location is None:
-        if app_insights_key is not None:
-            site_config.app_settings.append(NameValuePair(name='APPINSIGHTS_INSTRUMENTATIONKEY',
-                                                          value=app_insights_key))
-        elif app_insights is not None:
-            instrumentation_key = get_app_insights_key(cmd.cli_ctx, resource_group_name, app_insights)
-            site_config.app_settings.append(NameValuePair(name='APPINSIGHTS_INSTRUMENTATIONKEY',
-                                                          value=instrumentation_key))
-        elif disable_app_insights or not matched_runtime.app_insights:
-            # set up dashboard if no app insights
-            site_config.app_settings.append(NameValuePair(name='AzureWebJobsDashboard', value=con_string))
-        elif not disable_app_insights and matched_runtime.app_insights:
-            create_app_insights = True
+    params = {}
+    params['stamp'] = STAMP_NAME
+    poller = client.web_apps.begin_create_or_update(resource_group_name, name, functionapp_def, params = params, api_version = '2022-03-01-privatepreview')
+    functionapp = LongRunningOperation(cmd.cli_ctx)(poller)
 
     if flexconsumption_location:
-        return create_flex_functionapp(cmd, resource_group_name, name, functionapp_def)
-
-    poller = client.web_apps.begin_create_or_update(resource_group_name, name, functionapp_def)
-    functionapp = LongRunningOperation(cmd.cli_ctx)(poller)
+        functionapp.resource_group = resource_group_name
 
     if consumption_plan_location and is_linux:
         logger.warning("Your Linux function app '%s', that uses a consumption plan has been successfully "
