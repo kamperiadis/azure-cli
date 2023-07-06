@@ -748,7 +748,7 @@ subscription than the app service environment, please use the resource ID for --
                    help="Geographic location where function app will be hosted. Use `az functionapp list-flexconsumption-locations` to view available locations.", is_preview=True)
         c.argument('min_replicas', type=int, help="The minimum number of replicas when create funtion app on container app", is_preview=True)
         c.argument('max_replicas', type=int, help="The maximum number of replicas when create funtion app on container app", is_preview=True)
-
+        c.argument('src')
     with self.argument_context('functionapp cors credentials') as c:
         c.argument('enable', help='enable/disable access-control-allow-credentials', arg_type=get_three_state_flag())
 

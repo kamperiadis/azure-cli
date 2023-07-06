@@ -840,6 +840,41 @@ def upload_zip_to_storage(cmd, resource_group_name, name, src, slot=None):
             raise ex
 
 
+def temp_run_from_package(cmd, resource_group_name, name, src, storage_connection):
+
+    container_name = "function-releases"
+    blob_name = "{}-{}.zip".format(datetime.datetime.today().strftime('%Y%m%d%H%M%S'), str(uuid.uuid4()))
+    BlockBlobService = get_sdk(cmd.cli_ctx, ResourceType.DATA_STORAGE, 'blob#BlockBlobService')
+    block_blob_service = BlockBlobService(connection_string=storage_connection)
+    if not block_blob_service.exists(container_name):
+        block_blob_service.create_container(container_name)
+
+    # https://gist.github.com/vladignatyev/06860ec2040cb497f0f3
+    def progress_callback(current, total):
+        total_length = 30
+        filled_length = int(round(total_length * current) / float(total))
+        percents = round(100.0 * current / float(total), 1)
+        progress_bar = '=' * filled_length + '-' * (total_length - filled_length)
+        progress_message = 'Uploading {} {}%'.format(progress_bar, percents)
+        cmd.cli_ctx.get_progress_controller().add(message=progress_message)
+
+    block_blob_service.create_blob_from_path(container_name, blob_name, src, validate_content=True,
+                                             progress_callback=progress_callback)
+
+    now = datetime.datetime.utcnow()
+    blob_start = now - datetime.timedelta(minutes=10)
+    blob_end = now + datetime.timedelta(weeks=520)
+    BlobPermissions = get_sdk(cmd.cli_ctx, ResourceType.DATA_STORAGE, 'blob#BlobPermissions')
+    blob_token = block_blob_service.generate_blob_shared_access_signature(container_name,
+                                                                          blob_name,
+                                                                          permission=BlobPermissions(read=True),
+                                                                          expiry=blob_end,
+                                                                          start=blob_start)
+
+    blob_uri = block_blob_service.make_blob_url(container_name, blob_name, sas_token=blob_token)
+    return blob_uri
+
+
 # for generic updater
 def get_webapp(cmd, resource_group_name, name, slot=None):
     return _generic_site_operation(cmd.cli_ctx, resource_group_name, name, 'get', slot)
@@ -3771,7 +3806,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                        role='Contributor', scope=None, vnet=None, subnet=None, https_only=False,
                        environment=None, min_replicas=None, max_replicas=None,
                        always_ready_instances=None, maximum_instances=None, instance_size=None,
-                       flexconsumption_location="northcentralus(stage)"):
+                       flexconsumption_location="northcentralus(stage)", src=None):
     # pylint: disable=too-many-statements, too-many-branches
     if functions_version is None:
         if flexconsumption_location is not None:
@@ -4039,6 +4074,16 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                                                               value='true'))
     else:
         functionapp_def.kind = 'functionapp'
+
+    if src:
+        blob_uri = temp_run_from_package(cmd, resource_group_name, name, src, con_string)
+
+        site_config.app_settings.append(
+            NameValuePair(
+                name='WEBSITE_RUN_FROM_PACKAGE',
+                value=blob_uri
+            )
+        )
 
     # set site configs
     for prop, value in site_config_dict.as_dict().items():
