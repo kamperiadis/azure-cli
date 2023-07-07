@@ -4789,7 +4789,7 @@ def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vne
         delegations = subnetObj["delegations"]
         delegated = False
         for d in delegations:
-            if d["serviceName"].lower() == "microsoft.web/serverfarms".lower():
+            if d["serviceName"].lower() == "microsoft.app/environments".lower():
                 delegated = True
 
         if not delegated:
@@ -4797,7 +4797,7 @@ def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vne
                 "name": subnet_name,
                 "vnet_name": vnet_name,
                 "resource_group": vnet_resource_group,
-                "delegated_services": [{"name": "delegation", "service_name": "Microsoft.Web/serverFarms"}]
+                "delegated_services": [{"name": "delegation", "service_name": "Microsoft.App/environments"}]
             })
             LongRunningOperation(cmd.cli_ctx)(poller)
 
