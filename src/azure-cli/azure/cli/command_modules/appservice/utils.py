@@ -223,6 +223,10 @@ def _normalize_location(cmd, location):
     return location
 
 
+def _normalize_stage_location(location):
+    return location.replace("(stage)", "").replace("stage", "")
+
+
 def _remove_list_duplicates(webapp):
     outbound_ips = webapp.possible_outbound_ip_addresses.split(',')
     outbound_ips_list = list(dict.fromkeys(outbound_ips))
