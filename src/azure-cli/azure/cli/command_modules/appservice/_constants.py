@@ -155,3 +155,5 @@ FLEX_RUNTIMES = [
         }
     }
 ]
+
+FLEX_SUBNET_DELEGATION = "Microsoft.App/environments"
