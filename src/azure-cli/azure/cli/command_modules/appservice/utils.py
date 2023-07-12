@@ -223,7 +223,8 @@ def _normalize_location(cmd, location):
     return location
 
 
-def _normalize_stage_location(location):
+def _normalize_location_for_vnet_integration(cmd, location):
+    location = _normalize_location(cmd, location)
     return location.replace("(stage)", "").replace("stage", "")
 
 
