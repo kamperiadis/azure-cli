@@ -65,10 +65,11 @@ from .utils import (_normalize_sku,
                     is_functionapp,
                     _rename_server_farm_props,
                     _get_location_from_webapp,
-                    _normalize_location,
+                    _normalize_location_for_vnet_integration,
                     get_pool_manager, use_additional_properties, get_app_service_plan_from_webapp,
                     get_resource_if_exists, repo_url_to_name, get_token,
-                    app_service_plan_exists, is_centauri_functionapp, is_flex_functionapp, is_flex_functionapp_from_plan)
+                    app_service_plan_exists, is_centauri_functionapp, is_flex_functionapp, is_flex_functionapp_from_plan,
+                    _remove_list_duplicates)
 from ._create_util import (zip_contents_from_dir, get_runtime_version_details, create_resource_group, get_app_details,
                            check_resource_group_exists, set_location, get_site_availability, get_profile_username,
                            get_plan_to_use, get_lang_from_content, get_rg_to_use, get_sku_to_use,
@@ -79,7 +80,7 @@ from ._constants import (FUNCTIONS_STACKS_API_KEYS, FUNCTIONS_LINUX_RUNTIME_VERS
                          DOTNET_RUNTIME_NAME, NETCORE_RUNTIME_NAME, ASPDOTNET_RUNTIME_NAME, LINUX_OS_NAME,
                          WINDOWS_OS_NAME, LINUX_FUNCTIONAPP_GITHUB_ACTIONS_WORKFLOW_TEMPLATE_PATH,
                          WINDOWS_FUNCTIONAPP_GITHUB_ACTIONS_WORKFLOW_TEMPLATE_PATH, DEFAULT_CENTAURI_IMAGE,
-                         FLEX_RUNTIMES, STAMP_NAME)
+                         FLEX_RUNTIMES, STAMP_NAME, FLEX_SUBNET_DELEGATION, DEFAULT_INSTANCE_SIZE)
 from ._github_oauth import (get_github_access_token, cache_github_token)
 from ._validators import validate_and_convert_to_int, validate_range_of_int_flag
 
@@ -577,9 +578,10 @@ def enable_zip_deploy_functionapp(cmd, resource_group_name, name, src, build_rem
     if is_consumption and app.reserved:
         validate_zip_deploy_app_setting_exists(cmd, resource_group_name, name, slot)
 
-    if is_flex_functionapp_from_plan(cmd, plan_info):
-        return enable_zip_deploy_flex(cmd, resource_group_name, name, src, timeout, slot, build_remote, app)
-
+    if is_flex_functionapp(cmd, resource_group_name, name):
+        enable_zip_deploy_flex(cmd, resource_group_name, name, src, timeout, slot, build_remote)
+        response = check_flex_app_after_deployment(cmd, resource_group_name, name)
+        return response
     if (not build_remote) and is_consumption and app.reserved:
         return upload_zip_to_storage(cmd, resource_group_name, name, src, slot)
     if build_remote and app.reserved:
@@ -594,7 +596,43 @@ def enable_zip_deploy_webapp(cmd, resource_group_name, name, src, timeout=None, 
     return enable_zip_deploy(cmd, resource_group_name, name, src, timeout=timeout, slot=slot)
 
 
-def enable_zip_deploy_flex(cmd, resource_group_name, name, src, timeout=None, slot=None, build_remote=False, app=None):
+def check_flex_app_after_deployment(cmd, resource_group_name, name):
+    import requests
+    from azure.cli.core.util import should_disable_connection_verify
+
+    logger.warning("Waiting for sync triggers...")
+    time.sleep(60)
+    logger.warning("Checking the health of the function app")
+
+    try:
+        host_url = _get_host_url(cmd, resource_group_name, name)
+    except ValueError:
+        raise ResourceNotFoundError('Failed to fetch host url for function app')
+
+    try:
+        master_key = list_host_keys(cmd, resource_group_name, name).master_key
+    except:
+        raise ResourceNotFoundError('Failed to fetch host key to check for function app status')
+
+    host_status_url = host_url + '/admin/host/status'
+    headers = {"x-functions-key": master_key}
+    
+    total_trials = 15
+    num_trials = 0
+    while num_trials < total_trials:
+        time.sleep(2)
+        response = requests.get(host_status_url, headers=headers,
+                                verify=not should_disable_connection_verify())
+        if response.status_code == 200:
+            break
+
+    if response.status_code != 200:
+        raise CLIError("Deployment was successful but the app appears to be unhealthy. Please "
+                       "check the app logs.")
+    return "Deployment was successful."
+
+
+def enable_zip_deploy_flex(cmd, resource_group_name, name, src, timeout=None, slot=None, build_remote=False):
     logger.warning("Getting scm site credentials for zip deployment")
 
     try:
@@ -1048,6 +1086,7 @@ def show_app(cmd, resource_group_name, name, slot=None):
     if not is_centauri_functionapp(cmd, resource_group_name, name):
         _rename_server_farm_props(app)
         _fill_ftp_publishing_url(cmd, app, resource_group_name, name, slot)
+        _remove_list_duplicates(app)
     return app
 
 
@@ -2278,7 +2317,7 @@ def update_app_service_plan(instance, sku=None, number_of_workers=None, elastic_
 def show_plan(cmd, resource_group_name, name):
     from azure.cli.core.commands.client_factory import get_subscription_id
     client = web_client_factory(cmd.cli_ctx)
-    serverfarm_url_base = 'subscriptions/{}/resourceGroups/{}/providers/Microsoft.Web/serverfarms/{}?api-version={}'
+    serverfarm_url_base = '/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Web/serverfarms/{}?api-version={}'
     subscription_id = get_subscription_id(cmd.cli_ctx)
     serverfarm_url = serverfarm_url_base.format(subscription_id, resource_group_name, name, client.DEFAULT_API_VERSION)
     request_url = cmd.cli_ctx.cloud.endpoints.resource_manager + serverfarm_url
@@ -2505,6 +2544,20 @@ def _get_scm_url(cmd, resource_group_name, name, slot=None):
 
     # this should not happen, but throw anyway
     raise ResourceNotFoundError('Failed to retrieve Scm Uri')
+
+
+def _get_host_url(cmd, resource_group_name, name):
+    from azure.mgmt.web.models import HostType
+    params = {}
+    params['stamp'] = STAMP_NAME
+    client = web_client_factory(cmd.cli_ctx)
+    app = client.web_apps.get(resource_group_name, name, api_version='2022-03-01-privatepreview', params=params)
+    for host in app.host_name_ssl_states or []:
+        if host.host_type == HostType.standard:
+            return "https://{}".format(host.name)
+
+    # this should not happen, but throw anyway
+    raise ResourceNotFoundError('Failed to retrieve Host Uri')
 
 
 def get_publishing_user(cmd):
@@ -3181,14 +3234,20 @@ def _update_ssl_binding(cmd, resource_group_name, name, certificate_thumbprint, 
     webapp_certs = client.certificates.list_by_resource_group(cert_resource_group_name)
 
     found_cert = None
+    # search for a cert that matches in the app service plan's RG
     for webapp_cert in webapp_certs:
         if webapp_cert.thumbprint == certificate_thumbprint:
             found_cert = webapp_cert
+    # search for a cert that matches in the webapp's RG
     if not found_cert:
         webapp_certs = client.certificates.list_by_resource_group(resource_group_name)
         for webapp_cert in webapp_certs:
             if webapp_cert.thumbprint == certificate_thumbprint:
                 found_cert = webapp_cert
+    # search for a cert that matches in the subscription, filtering on the serverfarm
+    if not found_cert:
+        sub_certs = client.certificates.list(filter=f"ServerFarmId eq '{webapp.server_farm_id}'")
+        found_cert = next(iter([c for c in sub_certs if c.thumbprint == certificate_thumbprint]), None)
     if found_cert:
         if not hostname:
             if len(found_cert.host_names) == 1 and not found_cert.host_names[0].startswith('*'):
@@ -3829,9 +3888,16 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                        flexconsumption_location=None):
     # pylint: disable=too-many-statements, too-many-branches
     if functions_version is None:
-        logger.warning("No functions version specified so defaulting to 3. In the future, specifying a version will "
-                       "be required. To create a 3.x function you would pass in the flag `--functions-version 3`")
-        functions_version = '3'
+        if flexconsumption_location is not None:
+            logger.warning("No functions version specified so defaulting to 4. In the future, specifying a "
+                           "version will be required. To create a 4.x function you would pass in the flag "
+                           "`--functions-version 4`")
+            functions_version = '4'
+        else:
+            logger.warning("No functions version specified so defaulting to 3. In the future, specifying a "
+                           "version will be required. To create a 3.x function you would pass in the flag "
+                           "`--functions-version 3`")
+            functions_version = '3'
     if deployment_source_url and deployment_local_git:
         raise MutuallyExclusiveArgumentError('usage error: --deployment-source-url <url> | --deployment-local-git')
     if environment is None and not is_exactly_one_true(plan, consumption_plan_location, flexconsumption_location):
@@ -3871,10 +3937,22 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                 'Please try again without the --os-type parameter or set --os-type to be linux.'
             )
 
-        if instance_size is None:
-            raise RequiredArgumentMissingError(
-                '--instance-size must be used with parameter --flexconsumption-location. '
-                'Please try again with the --instance-size parameter.'
+        if functions_version != '4':
+            raise ArgumentUsageError(
+                '--functions-version must be set to 4 for Azure Functions on the Flex Consumption plan. '
+                'Please try again with the --functions-version parameter set to 4.'
+            )
+
+        if maximum_instances and always_ready_instances and maximum_instances < always_ready_instances:
+            raise ArgumentUsageError(
+                '--maximum-instances is less than --always-ready-instances. '
+                'Please try again with --always-ready-instances being less than or equal to --maximum-instances.'
+            )
+
+        if maximum_instances and maximum_instances > 1000:
+            raise ValidationError(
+                '--maximum-instances exceeds the maximum allowed for Azure Functions on the Flex Consumption plan. '
+                'Please try again with a valid --maximum-instances value.'
             )
 
     if ((always_ready_instances is not None or maximum_instances is not None or instance_size is not None) and
@@ -4129,8 +4207,8 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
     if maximum_instances:
         site_config.function_app_scale_limit = maximum_instances
 
-    if instance_size:
-        functionapp_def.container_size = instance_size
+    if flexconsumption_location is not None:
+        functionapp_def.container_size = instance_size or DEFAULT_INSTANCE_SIZE
 
     # temporary workaround for dotnet-isolated linux consumption apps
     if is_linux and consumption_plan_location is not None and runtime == 'dotnet-isolated':
@@ -4251,7 +4329,8 @@ def try_create_application_insights(cmd, functionapp):
 
     ai_resource_group_name = functionapp.resource_group
     ai_name = functionapp.name
-    ai_location = functionapp.location
+    # Temporary change for testing
+    ai_location = functionapp.location.replace("(stage)", "").replace("stage", "")
 
     app_insights_client = get_mgmt_service_client(cmd.cli_ctx, ApplicationInsightsManagementClient)
     ai_properties = {
@@ -4376,25 +4455,40 @@ def _check_zip_deployment_status(cmd, rg_name, name, deployment_status_url, slot
     headers = get_scm_site_headers(cmd.cli_ctx, name, rg_name, slot)
     total_trials = (int(timeout) // 2) if timeout else 450
     num_trials = 0
+    # Indicates whether the status has been non empty in previous calls
+    has_response = False
     while num_trials < total_trials:
         time.sleep(2)
         response = requests.get(deployment_status_url, headers=headers,
                                 verify=False)
         try:
             res_dict = response.json()
+            if res_dict.get('status') is None and has_response:
+                raise CLIError("Failed to retrieve deployment status. Please visit {}".format(deployment_status_url))
+            elif res_dict.get('status') is not None and not has_response:
+                has_response = True
         except json.decoder.JSONDecodeError:
             logger.warning("Deployment status endpoint %s returns malformed data. Retrying...", deployment_status_url)
             res_dict = {}
         finally:
             num_trials = num_trials + 1
 
-        if res_dict.get('status', 0) == 3:
+        status = res_dict.get('status', 0)
+
+        if status == -1:
+            raise CLIError("Deployment was cancelled.")
+        elif status == 3:
             if not is_flex_functionapp(cmd, rg_name, name):
                 _configure_default_logging(cmd, rg_name, name)
-            raise CLIError("Zip deployment failed. {}. Please run the command az webapp log deployment show "
-                           "-n {} -g {}".format(res_dict, name, rg_name))
-        if res_dict.get('status', 0) == 4:
+            raise CLIError("Zip deployment failed. {}. These are the deployment logs: \n{}".format(
+                           res_dict, json.dumps(show_deployment_log(cmd, rg_name, name))))
+        elif status == 4:
             break
+        elif status == 5:
+            raise CLIError("Deployment was cancelled and another deployment is in progress.")
+        elif status == 6:
+            raise CLIError("Deployment was partially successful. These are the deployment logs:\n{}".format(
+                           json.dumps(show_deployment_log(cmd, rg_name, name))))
         if 'progress' in res_dict:
             logger.info(res_dict['progress'])  # show only in debug mode, customers seem to find this confusing
     # if the deployment is taking longer than expected
@@ -4743,6 +4837,7 @@ def _add_vnet_integration(cmd, name, resource_group_name, vnet, subnet, slot=Non
     params = {}
     params['stamp'] = STAMP_NAME
     plan_info = client.app_service_plans.get(parsed_plan['resource_group'], parsed_plan["name"], api_version='2022-03-01-privatepreview', params=params)
+    is_flex = is_flex_functionapp(cmd, resource_group_name, name)
 
     if skip_delegation_check:
         logger.warning('Skipping delegation check. Ensure that subnet is delegated to Microsoft.Web/serverFarms.'
@@ -4751,7 +4846,8 @@ def _add_vnet_integration(cmd, name, resource_group_name, vnet, subnet, slot=Non
         _vnet_delegation_check(cmd, subnet_subscription_id=subnet_info["subnet_subscription_id"],
                                vnet_resource_group=subnet_info["resource_group_name"],
                                vnet_name=subnet_info["vnet_name"],
-                               subnet_name=subnet_info["subnet_name"])
+                               subnet_name=subnet_info["subnet_name"],
+                               subnet_service_delegation=FLEX_SUBNET_DELEGATION if is_flex else None)
 
     app.virtual_network_subnet_id = subnet_info["subnet_resource_id"]
     app.vnet_route_all_enabled = True
@@ -4769,7 +4865,8 @@ def _add_vnet_integration(cmd, name, resource_group_name, vnet, subnet, slot=Non
     }
 
 
-def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vnet_name, subnet_name):
+def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vnet_name, subnet_name,
+                           subnet_service_delegation="Microsoft.Web/serverFarms"):
     from azure.cli.core.commands.client_factory import get_subscription_id
 
     if get_subscription_id(cmd.cli_ctx).lower() != subnet_subscription_id.lower():
@@ -4779,7 +4876,7 @@ def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vne
                        '--resource-group %s '
                        '--name %s '
                        '--vnet-name %s '
-                       '--delegations Microsoft.Web/serverFarms', vnet_resource_group, subnet_name, vnet_name)
+                       '--delegations %s', vnet_resource_group, subnet_name, vnet_name, subnet_service_delegation)
     else:
         subnetObj = SubnetShow(cli_ctx=cmd.cli_ctx)(command_args={
             "name": subnet_name,
@@ -4789,7 +4886,7 @@ def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vne
         delegations = subnetObj["delegations"]
         delegated = False
         for d in delegations:
-            if d["serviceName"].lower() == "microsoft.web/serverfarms".lower():
+            if d["serviceName"].lower() == subnet_service_delegation.lower():
                 delegated = True
 
         if not delegated:
@@ -4797,7 +4894,7 @@ def _vnet_delegation_check(cmd, subnet_subscription_id, vnet_resource_group, vne
                 "name": subnet_name,
                 "vnet_name": vnet_name,
                 "resource_group": vnet_resource_group,
-                "delegated_services": [{"name": "delegation", "service_name": "Microsoft.Web/serverFarms"}]
+                "delegated_services": [{"name": "delegation", "service_name": subnet_service_delegation}]
             })
             LongRunningOperation(cmd.cli_ctx)(poller)
 
@@ -5390,14 +5487,14 @@ def _get_onedeploy_request_body(params):
 
 
 def _update_artifact_type(params):
-    import ntpath
+    import os
 
     if params.artifact_type is not None:
         return
 
     # Interpret deployment type from the file extension if the type parameter is not passed
-    file_name = ntpath.basename(params.src_path)
-    file_extension = file_name.split(".", 1)[1]
+    _, file_extension = os.path.splitext(params.src_path)
+    file_extension = file_extension[1:]
     if file_extension in ('war', 'jar', 'ear', 'zip'):
         params.artifact_type = file_extension
     elif file_extension in ('sh', 'bat'):
@@ -5757,7 +5854,7 @@ def add_github_actions(cmd, resource_group, name, repo, runtime=None, token=None
         cmd=cmd, resource_group=resource_group, name=name, slot=slot, is_linux=is_linux)
 
     app_runtime_string = None
-    if(app_runtime_info and app_runtime_info['display_name']):
+    if (app_runtime_info and app_runtime_info['display_name']):
         app_runtime_string = app_runtime_info['display_name']
 
     github_actions_version = None

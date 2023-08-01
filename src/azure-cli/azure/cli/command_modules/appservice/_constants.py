@@ -122,3 +122,6 @@ FLEX_RUNTIMES = [
 ]
 
 STAMP_NAME = 'kc11geo.eastus.cloudapp.azure.com'
+FLEX_SUBNET_DELEGATION = "Microsoft.App/environments"
+
+DEFAULT_INSTANCE_SIZE = 2048
