@@ -1730,13 +1730,13 @@ def update_scale_config(cmd, resource_group_name, name, maximum_instance_count=N
         if not getattr(scale_config, 'triggers', None):
             scale_config.triggers = FunctionsScaleAndConcurrencyTriggers()
         snake_case_trigger_type = _convert_camel_to_snake_case(trigger_type)
+        if snake_case_trigger_type not in scale_config.triggers.__dict__:
+            raise ValidationError("The trigger type '{}' is not valid.".format(trigger_type))
+        if not getattr(scale_config.triggers, snake_case_trigger_type, None):
+            if snake_case_trigger_type == 'http':
+                scale_config.triggers.http = FunctionsScaleAndConcurrencyTriggersHttp()
         triggers_dict = _parse_key_value_pairs(trigger_settings)
         for key, value in triggers_dict.items():
-            if snake_case_trigger_type not in scale_config.triggers.__dict__:
-                raise ValidationError("The trigger type '{}' is not valid.".format(trigger_type))
-            if not getattr(scale_config.triggers, snake_case_trigger_type, None):
-                if snake_case_trigger_type == 'http':
-                    scale_config.triggers.http = FunctionsScaleAndConcurrencyTriggersHttp()
             snake_case_key = _convert_camel_to_snake_case(key)
             if snake_case_key not in getattr(scale_config.triggers, snake_case_trigger_type).__dict__:
                 raise ValidationError("The trigger setting '{}' is not valid for the "
