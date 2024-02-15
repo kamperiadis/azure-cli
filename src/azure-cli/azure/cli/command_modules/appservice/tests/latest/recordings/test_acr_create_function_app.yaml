@@ -264,7 +264,7 @@ interactions:
     uri: https://management.azure.com/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/clitest.rg000001/providers/Microsoft.ContainerRegistry/registries/functionappacrtest000004/listCredentials?api-version=2022-02-01-preview
   response:
     body:
-      string: '{"username":"functionappacrtest000004","passwords":[{"name":"password","value":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"},{"name":"password2","value":"+m1zI7wm9tSJSTn4xBgpDjTUu9fi0irxeztESDvotu+ACRDdIWn8"}]}'
+      string: '{"username":"functionappacrtest000004","passwords":[{"name":"password","value":""},{"name":"password2","value":""}]}'
     headers:
       api-supported-versions:
       - 2022-02-01-preview
@@ -2395,7 +2395,7 @@ interactions:
       "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/",
       "DOCKER_REGISTRY_SERVER_URL": "https://functionappacrtest000004.azurecr.io",
       "DOCKER_REGISTRY_SERVER_USERNAME": "functionappacrtest000004", "DOCKER_REGISTRY_SERVER_PASSWORD":
-      "nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
+      "password"}}'
     headers:
       Accept:
       - application/json
@@ -2419,7 +2419,7 @@ interactions:
   response:
     body:
       string: '{"id":"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/clitest.rg000001/providers/Microsoft.Web/sites/functionappacrtest000004/config/appsettings","name":"appsettings","type":"Microsoft.Web/sites/config","location":"Brazil
-        South","properties":{"MACHINEKEY_DecryptionKey":"0F1C5C28600B92C64F619ED228D7B983E46A9FE4434D602B71E55F8088696E4F","DOCKER_CUSTOM_IMAGE_NAME":"functionappacrtest000004.azurecr.io/image-name:latest","FUNCTION_APP_EDIT_MODE":"readOnly","WEBSITES_ENABLE_APP_SERVICE_STORAGE":"false","FUNCTIONS_EXTENSION_VERSION":"~4","AzureWebJobsStorage":"DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=clitestacr000002;AccountKey=veryFakedStorageAccountKey==","APPLICATIONINSIGHTS_CONNECTION_STRING":"InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/","DOCKER_REGISTRY_SERVER_URL":"https://functionappacrtest000004.azurecr.io","DOCKER_REGISTRY_SERVER_USERNAME":"functionappacrtest000004","DOCKER_REGISTRY_SERVER_PASSWORD":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
+        South","properties":{"MACHINEKEY_DecryptionKey":"key","DOCKER_CUSTOM_IMAGE_NAME":"functionappacrtest000004.azurecr.io/image-name:latest","FUNCTION_APP_EDIT_MODE":"readOnly","WEBSITES_ENABLE_APP_SERVICE_STORAGE":"false","FUNCTIONS_EXTENSION_VERSION":"~4","AzureWebJobsStorage":"DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=clitestacr000002;AccountKey=veryFakedStorageAccountKey==","APPLICATIONINSIGHTS_CONNECTION_STRING":"InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/","DOCKER_REGISTRY_SERVER_URL":"https://functionappacrtest000004.azurecr.io","DOCKER_REGISTRY_SERVER_USERNAME":"functionappacrtest000004","DOCKER_REGISTRY_SERVER_PASSWORD":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
     headers:
       cache-control:
       - no-cache
@@ -2475,7 +2475,7 @@ interactions:
   response:
     body:
       string: '{"id":"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/clitest.rg000001/providers/Microsoft.Web/sites/functionappacrtest000004/config/appsettings","name":"appsettings","type":"Microsoft.Web/sites/config","location":"Brazil
-        South","properties":{"MACHINEKEY_DecryptionKey":"0F1C5C28600B92C64F619ED228D7B983E46A9FE4434D602B71E55F8088696E4F","DOCKER_CUSTOM_IMAGE_NAME":"functionappacrtest000004.azurecr.io/image-name:latest","FUNCTION_APP_EDIT_MODE":"readOnly","WEBSITES_ENABLE_APP_SERVICE_STORAGE":"false","FUNCTIONS_EXTENSION_VERSION":"~4","AzureWebJobsStorage":"DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=clitestacr000002;AccountKey=veryFakedStorageAccountKey==","APPLICATIONINSIGHTS_CONNECTION_STRING":"InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/","DOCKER_REGISTRY_SERVER_URL":"https://functionappacrtest000004.azurecr.io","DOCKER_REGISTRY_SERVER_USERNAME":"functionappacrtest000004","DOCKER_REGISTRY_SERVER_PASSWORD":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
+        South","properties":{"MACHINEKEY_DecryptionKey":"key","DOCKER_CUSTOM_IMAGE_NAME":"functionappacrtest000004.azurecr.io/image-name:latest","FUNCTION_APP_EDIT_MODE":"readOnly","WEBSITES_ENABLE_APP_SERVICE_STORAGE":"false","FUNCTIONS_EXTENSION_VERSION":"~4","AzureWebJobsStorage":"DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=clitestacr000002;AccountKey=veryFakedStorageAccountKey==","APPLICATIONINSIGHTS_CONNECTION_STRING":"InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/","DOCKER_REGISTRY_SERVER_URL":"https://functionappacrtest000004.azurecr.io","DOCKER_REGISTRY_SERVER_USERNAME":"functionappacrtest000004","DOCKER_REGISTRY_SERVER_PASSWORD":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
     headers:
       cache-control:
       - no-cache
@@ -2838,7 +2838,7 @@ interactions:
   response:
     body:
       string: '{"id":"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/clitest.rg000001/providers/Microsoft.Web/sites/functionappacrtest000004/config/appsettings","name":"appsettings","type":"Microsoft.Web/sites/config","location":"Brazil
-        South","properties":{"MACHINEKEY_DecryptionKey":"0F1C5C28600B92C64F619ED228D7B983E46A9FE4434D602B71E55F8088696E4F","DOCKER_CUSTOM_IMAGE_NAME":"functionappacrtest000004.azurecr.io/image-name:latest","FUNCTION_APP_EDIT_MODE":"readOnly","WEBSITES_ENABLE_APP_SERVICE_STORAGE":"false","FUNCTIONS_EXTENSION_VERSION":"~4","AzureWebJobsStorage":"DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=clitestacr000002;AccountKey=veryFakedStorageAccountKey==","APPLICATIONINSIGHTS_CONNECTION_STRING":"InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/","DOCKER_REGISTRY_SERVER_URL":"https://functionappacrtest000004.azurecr.io","DOCKER_REGISTRY_SERVER_USERNAME":"functionappacrtest000004","DOCKER_REGISTRY_SERVER_PASSWORD":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
+        South","properties":{"MACHINEKEY_DecryptionKey":"key","DOCKER_CUSTOM_IMAGE_NAME":"functionappacrtest000004.azurecr.io/image-name:latest","FUNCTION_APP_EDIT_MODE":"readOnly","WEBSITES_ENABLE_APP_SERVICE_STORAGE":"false","FUNCTIONS_EXTENSION_VERSION":"~4","AzureWebJobsStorage":"DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=clitestacr000002;AccountKey=veryFakedStorageAccountKey==","APPLICATIONINSIGHTS_CONNECTION_STRING":"InstrumentationKey=5cf40cba-9675-4cff-869e-12f99f4b31fa;IngestionEndpoint=https://brazilsouth-1.in.applicationinsights.azure.com/;LiveEndpoint=https://brazilsouth.livediagnostics.monitor.azure.com/","DOCKER_REGISTRY_SERVER_URL":"https://functionappacrtest000004.azurecr.io","DOCKER_REGISTRY_SERVER_USERNAME":"functionappacrtest000004","DOCKER_REGISTRY_SERVER_PASSWORD":"nbXdFBlm7nsKHuHUIxp7iD5nQFGWtFUvCoYmoxSdGm+ACRAzSCQE"}}'
     headers:
       cache-control:
       - no-cache

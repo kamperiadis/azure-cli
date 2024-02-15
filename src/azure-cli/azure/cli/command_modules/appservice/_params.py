@@ -177,6 +177,7 @@ subscription than the app service environment, please use the resource ID for --
 
     with self.argument_context('functionapp list-runtimes') as c:
         c.argument('os_type', options_list=["--os", "--os-type"], help="limit the output to just windows or linux runtimes", arg_type=get_enum_type([LINUX_OS_NAME, WINDOWS_OS_NAME]))
+        c.argument('sku', help="list runtime stacks for this specific sku. Only 'flex' sku is supported for this parameter. Use --os for other SKUs.", arg_type=get_enum_type(['flex']))
 
     with self.argument_context('webapp deleted list') as c:
         c.argument('name', arg_type=webapp_name_arg_type, id_part=None)
@@ -771,6 +772,15 @@ subscription than the app service environment, please use the resource ID for --
         c.argument('registry_username', options_list=['--registry-username', '-d', c.deprecate(target='--docker-registry-server-user', redirect='--registry-username')], help='The container registry server username.')
         c.argument('registry_password', options_list=['--registry-password', '-w', c.deprecate(target='--docker-registry-server-password', redirect='--registry-password')],
                    help='The container registry server password. Required for private registries.')
+        c.argument('always_ready_instances', nargs='+', help="space-separated configuration for the number of pre-allocated instances in the format `<name>=<value>`", is_preview=True)
+        c.argument('maximum_instance_count', type=int, help="The maximum number of instances.", is_preview=True)
+        c.argument('instance_memory', type=int, help="The instance memory size in MB.", is_preview=True)
+        c.argument('flexconsumption_location', options_list=['--flexconsumption-location', '-f'],
+                   help="Geographic location where function app will be hosted. Use `az functionapp list-flexconsumption-locations` to view available locations.", is_preview=True)
+        c.argument('deployment_storage_name', help="The deployment storage account name.", is_preview=True)
+        c.argument('deployment_storage_container_name', help="The deployment storage account container name.", is_preview=True)
+        c.argument('deployment_storage_auth_type', arg_type=get_enum_type(DEPLOYMENT_STORAGE_AUTH_TYPES), help="The deployment storage account authentication type.", is_preview=True)
+        c.argument('deployment_storage_auth_value', help="The deployment storage account authentication value. This is only applicable for the user-assigned managed identity authentication type.", is_preview=True)
         c.argument('min_replicas', type=int, help="The minimum number of replicas when create function app on container app", is_preview=True)
         c.argument('max_replicas', type=int, help="The maximum number of replicas when create function app on container app", is_preview=True)
         c.argument('enable_dapr', help="Enable/Disable Dapr for a function app on an Azure Container App environment", arg_type=get_three_state_flag(return_label=True))
@@ -793,6 +803,13 @@ subscription than the app service environment, please use the resource ID for --
         c.argument('deployment_storage_container_name', help="The deployment storage account container name.", is_preview=True)
         c.argument('deployment_storage_auth_type', arg_type=get_enum_type(DEPLOYMENT_STORAGE_AUTH_TYPES), help="The deployment storage account authentication type.", is_preview=True)
         c.argument('deployment_storage_auth_value', help="The deployment storage account authentication value. This is only applicable for the user-assigned managed identity authentication type.", is_preview=True)
+        
+    with self.argument_context('az functionapp deployment config set') as c:
+        c.argument('deployment_storage_name', help="The deployment storage account name.", is_preview=True)
+        c.argument('deployment_storage_container_name', help="The deployment storage account container name.", is_preview=True)
+        c.argument('deployment_storage_auth_type', arg_type=get_enum_type(DEPLOYMENT_STORAGE_AUTH_TYPES), help="The deployment storage account authentication type.", is_preview=True)
+        c.argument('deployment_storage_auth_value', help="The deployment storage account authentication value. This is only applicable for the user-assigned managed identity authentication type.", is_preview=True)
+
 
     with self.argument_context('functionapp cors credentials') as c:
         c.argument('enable', help='enable/disable access-control-allow-credentials', arg_type=get_three_state_flag())
