@@ -170,6 +170,8 @@ def is_centauri_functionapp(cmd, resource_group, name):
 def is_flex_functionapp(cli_ctx, resource_group, name):
     client = web_client_factory(cli_ctx)
     app = client.web_apps.get(resource_group, name)
+    if app.server_farm_id is None:
+        return False
     parse_plan_id = parse_resource_id(app.server_farm_id)
     plan_info = client.app_service_plans.get(parse_plan_id['resource_group'], parse_plan_id['name'])
     return plan_info.sku.tier.lower() == 'flexconsumption'
@@ -194,10 +196,9 @@ def _rename_server_farm_props(webapp):
 
 
 def get_raw_functionapp(cmd, resource_group_name, name):
-    client = web_client_factory(cmd.cli_ctx)
     site_url_base = '/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Web/sites/{}?api-version={}'
     subscription_id = get_subscription_id(cmd.cli_ctx)
-    site_url = site_url_base.format(subscription_id, resource_group_name, name, client.DEFAULT_API_VERSION)
+    site_url = site_url_base.format(subscription_id, resource_group_name, name, '2023-12-01')
     request_url = cmd.cli_ctx.cloud.endpoints.resource_manager + site_url
     response = send_raw_request(cmd.cli_ctx, "GET", request_url)
     return response.json()

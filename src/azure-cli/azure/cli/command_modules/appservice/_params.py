@@ -413,6 +413,9 @@ subscription than the app service environment, please use the resource ID for --
         c.argument('cpu', type=float, help="Required CPU in cores from 0.5 to 2.0.", is_preview=True)
         c.argument('memory', help="Required momory from 1.0 to 4.0 ending with ""Gi"" e.g. 1.0Gi, ", is_preview=True)
 
+    with self.argument_context('functionapp runtime config') as c:
+        c.argument('runtime_version', help='The version of the functions runtime stack. Use "az functionapp list-runtimes" to check supported runtimes and versions', is_preview=True)
+
     with self.argument_context('functionapp scale config') as c:
         c.argument('maximum_instance_count', type=int, help="The maximum number of instances.", is_preview=True)
         c.argument('instance_memory', type=int, help="The instance memory size in MB.", is_preview=True)
@@ -439,7 +442,7 @@ subscription than the app service environment, please use the resource ID for --
         c.argument('xml', options_list=['--xml'], required=False, help='retrieves the publishing profile details in XML format')
     with self.argument_context('webapp deployment slot') as c:
         c.argument('slot', help='the name of the slot')
-        c.argument('name', arg_type=name_arg_type, completer=get_resource_name_completion_list('Microsoft.Web/sites'),
+        c.argument('webapp', arg_type=name_arg_type, completer=get_resource_name_completion_list('Microsoft.Web/sites'),
                    help='Name of the webapp', id_part='name',
                    local_context_attribute=LocalContextAttribute(name='web_name', actions=[LocalContextAction.GET]))
         c.argument('auto_swap_slot', help='target slot to auto swap', default='production')
@@ -779,17 +782,23 @@ subscription than the app service environment, please use the resource ID for --
         c.argument('dapr_enable_api_logging', options_list=['--dapr-enable-api-logging', '--dal'], help="Enable/Disable API logging for the Dapr sidecar.", arg_type=get_three_state_flag(return_label=True))
         c.argument('always_ready_instances', nargs='+', help="space-separated configuration for the number of pre-allocated instances in the format `<name>=<value>`", is_preview=True)
         c.argument('maximum_instance_count', type=int, help="The maximum number of instances.", is_preview=True)
-        c.argument('instance_memory', type=int, help="The instance memory size in MB.", is_preview=True)
+        c.argument('instance_memory', type=int, help="The instance memory size in MB. See https://aka.ms/flex-instance-sizes for more information on the supported values.", is_preview=True)
         c.argument('flexconsumption_location', options_list=['--flexconsumption-location', '-f'],
                    help="Geographic location where function app will be hosted. Use `az functionapp list-flexconsumption-locations` to view available locations.", is_preview=True)
         c.argument('workspace', help="Name of an existing log analytics workspace to be used for the application insights component")
         c.argument('workload_profile_name', help="The workload profile name to run the container app on.", is_preview=True)
         c.argument('cpu', type=float, help="The CPU in cores of the container app. e.g 0.75", is_preview=True)
         c.argument('memory', help="The memory size of the container app. e.g. 1.0Gi, ", is_preview=True)
-        c.argument('deployment_storage_name', help="The deployment storage account name.", is_preview=True)
-        c.argument('deployment_storage_container_name', help="The deployment storage account container name.", is_preview=True)
-        c.argument('deployment_storage_auth_type', arg_type=get_enum_type(DEPLOYMENT_STORAGE_AUTH_TYPES), help="The deployment storage account authentication type.", is_preview=True)
-        c.argument('deployment_storage_auth_value', help="The deployment storage account authentication value. This is only applicable for the user-assigned managed identity authentication type.", is_preview=True)
+        c.argument('deployment_storage_name', options_list=['--deployment-storage-name', '--dsn'], help="The deployment storage account name.", is_preview=True)
+        c.argument('deployment_storage_container_name', options_list=['--deployment-storage-container-name', '--dscn'], help="The deployment storage account container name.", is_preview=True)
+        c.argument('deployment_storage_auth_type', options_list=['--deployment-storage-auth-type', '--dsat'], arg_type=get_enum_type(DEPLOYMENT_STORAGE_AUTH_TYPES), help="The deployment storage account authentication type.", is_preview=True)
+        c.argument('deployment_storage_auth_value', options_list=['--deployment-storage-auth-value', '--dsav'], help="The deployment storage account authentication value. This is only applicable for the user-assigned managed identity authentication type.", is_preview=True)
+
+    with self.argument_context('functionapp deployment config set') as c:
+        c.argument('deployment_storage_name', options_list=['--deployment-storage-name', '--dsn'], help="The deployment storage account name.", is_preview=True)
+        c.argument('deployment_storage_container_name', options_list=['--deployment-storage-container-name', '--dscn'], help="The deployment storage account container name.", is_preview=True)
+        c.argument('deployment_storage_auth_type', options_list=['--deployment-storage-auth-type', '--dsat'], arg_type=get_enum_type(DEPLOYMENT_STORAGE_AUTH_TYPES), help="The deployment storage account authentication type.", is_preview=True)
+        c.argument('deployment_storage_auth_value', options_list=['--deployment-storage-auth-value', '--dsav'], help="The deployment storage account authentication value. This is only applicable for the user-assigned managed identity authentication type.", is_preview=True)
 
     with self.argument_context('functionapp cors credentials') as c:
         c.argument('enable', help='enable/disable access-control-allow-credentials', arg_type=get_three_state_flag())
@@ -936,7 +945,9 @@ subscription than the app service environment, please use the resource ID for --
         c.argument('xml', options_list=['--xml'], required=False, help='retrieves the publishing profile details in XML format')
     with self.argument_context('functionapp deployment slot') as c:
         c.argument('slot', help='the name of the slot')
-        c.argument('name', arg_type=functionapp_name_arg_type,
+        # This is set to webapp to simply reuse webapp functions, without rewriting same functions for function apps.
+        # The help will still show "-n or --name", so it should not be a problem to do it this way
+        c.argument('webapp', arg_type=functionapp_name_arg_type,
                    completer=get_resource_name_completion_list('Microsoft.Web/sites'),
                    help='Name of the function app', id_part='name')
         c.argument('auto_swap_slot', help='target slot to auto swap', default='production')

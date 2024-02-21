@@ -143,8 +143,16 @@ FLEX_RUNTIMES = [
         'version': '6'
     },
     {
+        'runtime': 'dotnet-isolated',
+        'version': '8'
+    },
+    {
         'runtime': 'java',
         'version': '17.0'
+    },
+    {
+        'runtime': 'java',
+        'version': '11.0'
     },
     {
         'runtime': 'node',
@@ -153,6 +161,10 @@ FLEX_RUNTIMES = [
     {
         'runtime': 'python',
         'version': '3.10'
+    },
+    {
+        'runtime': 'python',
+        'version': '3.11'
     },
     {
         'runtime': 'powershell',
@@ -164,6 +176,8 @@ FLEX_SUBNET_DELEGATION = "Microsoft.App/environments"
 
 DEFAULT_INSTANCE_SIZE = 2048
 
-DEPLOYMENT_STORAGE_AUTH_TYPES = ['systemAssignedIdentity', 'userAssignedIdentity', 'storageAccountConnectionString']
+DEFAULT_MAXIMUM_INSTANCE_COUNT = 100
+
+DEPLOYMENT_STORAGE_AUTH_TYPES = ['SystemAssignedIdentity', 'UserAssignedIdentity', 'StorageAccountConnectionString']
 
 STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
