@@ -195,15 +195,6 @@ def _rename_server_farm_props(webapp):
     return webapp
 
 
-def get_raw_functionapp(cmd, resource_group_name, name):
-    site_url_base = '/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Web/sites/{}?api-version={}'
-    subscription_id = get_subscription_id(cmd.cli_ctx)
-    site_url = site_url_base.format(subscription_id, resource_group_name, name, '2023-12-01')
-    request_url = cmd.cli_ctx.cloud.endpoints.resource_manager + site_url
-    response = send_raw_request(cmd.cli_ctx, "GET", request_url)
-    return response.json()
-
-
 def _get_location_from_webapp(client, resource_group_name, webapp):
     webapp = client.web_apps.get(resource_group_name, webapp)
     if not webapp:
