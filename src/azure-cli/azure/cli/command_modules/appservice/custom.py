@@ -415,14 +415,21 @@ def check_language_runtime(cmd, resource_group_name, name):
     client = web_client_factory(cmd.cli_ctx)
     app = client.web_apps.get(resource_group_name, name)
     is_linux = app.reserved
+    
     if is_functionapp(app):
+        is_flex = is_flex_functionapp(cmd.cli_ctx, resource_group_name, name)
         runtime_info = _get_functionapp_runtime_info(cmd, resource_group_name, name, None, is_linux)
         runtime = runtime_info['app_runtime']
         runtime_version = runtime_info['app_runtime_version']
         functions_version = runtime_info['functionapp_version']
-        runtime_helper = _FunctionAppStackRuntimeHelper(cmd=cmd, linux=is_linux, windows=(not is_linux))
         try:
-            runtime_helper.resolve(runtime, runtime_version, functions_version, is_linux)
+            if not is_flex:
+                runtime_helper = _FunctionAppStackRuntimeHelper(cmd=cmd, linux=is_linux, windows=(not is_linux))
+                runtime_helper.resolve(runtime, runtime_version, functions_version, is_linux)
+            else:
+                location = app.location
+                runtime_helper = _FlexFunctionAppStackRuntimeHelper(cmd, location, runtime, runtime_version)
+                runtime_helper.resolve(runtime, runtime_version)
         except ValidationError as e:
             logger.warning(e.error_msg)
 
@@ -1375,6 +1382,10 @@ def list_function_app_runtimes(cmd, os_type=None):
         return windows_stacks
     return {WINDOWS_OS_NAME: windows_stacks, LINUX_OS_NAME: linux_stacks, 'flex': FLEX_RUNTIMES}
 
+def list_flex_function_app_runtimes(cmd, location, runtime):
+    runtime_helper = _FlexFunctionAppStackRuntimeHelper(cmd, location, runtime)
+    return { 'flex': runtime_helper.stacks}
+
 
 def delete_logic_app(cmd, resource_group_name, name, slot=None):
     return _generic_site_operation(cmd.cli_ctx, resource_group_name, name, 'delete', slot)
@@ -1850,9 +1861,8 @@ def update_runtime_config(cmd, resource_group_name, name, runtime_version):
             functionapp["properties"]["functionAppConfig"]["runtime"] = {}
 
     runtime_info = _get_functionapp_runtime_info(cmd, resource_group_name, name, None, True)
-    runtime = runtime_info['app_runtime']
     functionapp_version = runtime_info['functionapp_version']
-
+    runtime = runtime_info['app_runtime']
     runtimes = [r for r in FLEX_RUNTIMES if r['runtime'] == runtime]
     lang = next((r for r in runtimes if r['version'] == runtime_version), None)
     if lang is None:
@@ -1860,9 +1870,10 @@ def update_runtime_config(cmd, resource_group_name, name, runtime_version):
         raise ValidationError("Invalid version {0} for runtime {1} for function apps on the "
                               "Flex Consumption plan. Supported version for runtime {1} is {2}."
                               .format(runtime_version, runtime, supported_versions))
-
-    runtime_helper = _FunctionAppStackRuntimeHelper(cmd, linux=True, windows=False)
-    matched_runtime = runtime_helper.resolve(runtime, runtime_version, functionapp_version, True)
+    
+    location = functionapp["location"]
+    runtime_helper = _FlexFunctionAppStackRuntimeHelper(cmd, location, runtime, runtime_version)
+    matched_runtime = runtime_helper.resolve(runtime, runtime_version)
     version = matched_runtime.version
 
     functionapp["properties"]["functionAppConfig"]["runtime"]["version"] = version
@@ -3997,13 +4008,20 @@ class _StackRuntimeHelper(_AbstractStackRuntimeHelper):
 
 class _FlexFunctionAppStackRuntimeHelper:
     class Runtime:
-        def __init__(self, name, version, app_insights=False, default=False, sku=None, end_of_life_date=None):
+        def __init__(self, name, version, app_insights=False, default=False, sku=None, end_of_life_date=None, runtime_info=None, github_actions_properties=None):
             self.name = name
             self.version = version
             self.app_insights = app_insights
             self.default = default
             self.sku = sku
             self.end_of_life_date = end_of_life_date
+            self.runtime_info = runtime_info
+            self.github_actions_properties = github_actions_properties
+    
+    class GithubActionsProperties:
+        def __init__(self, is_supported, supported_version):
+            self.is_supported = is_supported
+            self.supported_version = supported_version
 
     def __init__(self, cmd, location, runtime, runtime_version=None):
         self._cmd = cmd
@@ -4018,15 +4036,10 @@ class _FlexFunctionAppStackRuntimeHelper:
         return self._stacks
 
     def get_flex_raw_function_app_stacks(self, cmd, location, runtime):
-        # stacks_api_url = '/providers/Microsoft.Web/locations/{}/functionAppStacks?api-version=2020-10-01'
-        # '&removeHiddenStacks=true&removeDeprecatedStacks=true&stack={}'
-        # request_url = cmd.cli_ctx.cloud.endpoints.resource_manager + stacks_api_url.format(location, runtime)
-        # response = send_raw_request(cmd.cli_ctx, "GET", request_url)
-        # return response.json()['value']
-
-        # temporary use of constant since the changes are not available yet
-        from ._constants import SAMPLE
-        return json.loads(SAMPLE)['value']
+        stacks_api_url = '/providers/Microsoft.Web/locations/{}/functionAppStacks?api-version=2020-10-01&removeHiddenStacks=true&removeDeprecatedStacks=true&stack={}'
+        request_url = cmd.cli_ctx.cloud.endpoints.resource_manager + stacks_api_url.format(location, runtime)
+        response = send_raw_request(cmd.cli_ctx, "GET", request_url)
+        return response.json()['value']
 
     def _parse_raw_stacks(self, stacks):
         runtime_to_version = {}
@@ -4037,17 +4050,33 @@ class _FlexFunctionAppStackRuntimeHelper:
                     runtime_settings = minor_version['stackSettings']['linuxRuntimeSettings']
                     runtime_name = (runtime_settings['appSettingsDictionary']['FUNCTIONS_WORKER_RUNTIME'] or
                                     runtime['name'])
-                    if runtime_settings['Sku'] is None:
+                    skus = runtime_settings['Sku']
+                    github_actions_settings = runtime_settings['gitHubActionSettings']
+                    if skus is None:
                         continue
-                    runtime_version_properties = {
-                        'isDefault': runtime_settings.get('isDefault', False),
-                        'sku': runtime_settings['Sku'],
-                        'applicationInsights': runtime_settings['appInsightsSettings']['isSupported'],
-                        'endOfLifeDate': runtime_settings['endOfLifeDate']
-                    }
+                    
+                    for sku in skus:
+                        if sku['skuCode'] != 'FC1':
+                            continue
+                        
+                        function_app_config = sku['functionAppConfigProperties']
+                        
+                        github_actions_properties = {
+                            'is_supported': github_actions_settings.get('isSupported', False),
+                            'supported_version': github_actions_settings['supportedVersion'],
+                        }
+                        
+                        runtime_version_properties = {
+                            'isDefault': runtime_settings.get('isDefault', False),
+                            'sku': sku,
+                            'applicationInsights': runtime_settings['appInsightsSettings']['isSupported'],
+                            'endOfLifeDate': runtime_settings['endOfLifeDate'],
+                            'runtime_info': function_app_config,
+                            'github_actions_properties': self.GithubActionsProperties(**github_actions_properties)
+                        }
 
-                    runtime_to_version[runtime_name] = runtime_to_version.get(runtime_name, dict())
-                    runtime_to_version[runtime_name][runtime_version] = runtime_version_properties
+                        runtime_to_version[runtime_name] = runtime_to_version.get(runtime_name, dict())
+                        runtime_to_version[runtime_name][runtime_version] = runtime_version_properties
 
         for runtime_name, versions in runtime_to_version.items():
             for version_name, version_properties in versions.items():
@@ -4060,7 +4089,9 @@ class _FlexFunctionAppStackRuntimeHelper:
                             app_insights=version_properties['applicationInsights'],
                             default=version_properties['isDefault'],
                             sku=version_properties['sku'],
-                            end_of_life_date=version_properties['endOfLifeDate'])
+                            end_of_life_date=version_properties['endOfLifeDate'],
+                            runtime_info=version_properties['runtime_info'],
+                            github_actions_properties=version_properties['github_actions_properties'])
 
     def _load_stacks(self):
         if self._stacks:
@@ -4071,7 +4102,7 @@ class _FlexFunctionAppStackRuntimeHelper:
     def resolve(self, runtime, version=None):
         runtimes = self.stacks
         if not runtimes:
-            raise ValidationError("Runtime {} not supported for function apps on the Flex Consumption plan")
+            raise ValidationError("Runtime {} not supported for function apps on the Flex Consumption plan".format(runtime))
         if version is None:
             return self.get_default_version()
         matched_runtime_version = next((r for r in runtimes if r.version == version), None)
@@ -4766,7 +4797,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
                                                  runtime_version, functions_version, is_linux)
 
     if flexconsumption_location:
-        flex_sku = [s for s in matched_runtime.sku if s['skuCode'] == 'FC'][0]
+        flex_sku = matched_runtime.sku
         runtime = flex_sku['functionAppConfigProperties']['runtime']['name']
         version = flex_sku['functionAppConfigProperties']['runtime']['version']
         runtime_config = {
@@ -4957,6 +4988,7 @@ def create_functionapp(cmd, resource_group_name, name, storage_account, plan=Non
         existing_properties = functionapp_def.serialize()["properties"]
         functionapp_def.additional_properties["properties"] = existing_properties
         functionapp_def.additional_properties["properties"]["functionAppConfig"] = function_app_config
+        functionapp_def.additional_properties["properties"]["SKU"] = "FlexConsumption"
         poller = client.web_apps.begin_create_or_update(resource_group_name, name, functionapp_def,
                                                         api_version='2023-12-01')
         functionapp = LongRunningOperation(cmd.cli_ctx)(poller)
@@ -7304,6 +7336,7 @@ def add_functionapp_github_actions(cmd, resource_group, name, repo, runtime=None
     app = show_app(cmd, resource_group, name, slot)
     is_linux = app.reserved
 
+
     # Verify github repo
     from github import Github, GithubException
     from github.GithubException import BadCredentialsException, UnknownObjectException
@@ -7363,8 +7396,9 @@ def add_functionapp_github_actions(cmd, resource_group, name, repo, runtime=None
 
     # Verify runtime + gh actions support
     functionapp_version = app_runtime_info['functionapp_version']
-    github_actions_version = _get_functionapp_runtime_version(cmd=cmd, runtime_string=app_runtime_string,
-                                                              runtime_version=github_actions_version,
+    location = app.location
+    github_actions_version = _get_functionapp_runtime_version(cmd=cmd, location=location, name=name, resource_group=resource_group,
+                                                              runtime_string=app_runtime_string, runtime_version=github_actions_version,
                                                               functionapp_version=functionapp_version,
                                                               is_linux=is_linux)
     if not github_actions_version:
@@ -7827,12 +7861,18 @@ def _runtime_supports_github_actions(cmd, runtime_string, is_linux):
     return False
 
 
-def _get_functionapp_runtime_version(cmd, runtime_string, runtime_version, functionapp_version, is_linux):
+def _get_functionapp_runtime_version(cmd, location, name, resource_group, runtime_string, runtime_version, functionapp_version, is_linux):
     runtime_version = re.sub(r"[^\d\.]", "", runtime_version).rstrip('.')
     matched_runtime = None
-    helper = _FunctionAppStackRuntimeHelper(cmd, linux=(is_linux), windows=(not is_linux))
+    is_flex = is_flex_functionapp(cmd.cli_ctx, resource_group, name)
+    
     try:
-        matched_runtime = helper.resolve(runtime_string, runtime_version, functionapp_version, is_linux)
+        if (not is_flex):
+            helper = _FunctionAppStackRuntimeHelper(cmd, linux=(is_linux), windows=(not is_linux))
+            matched_runtime = helper.resolve(runtime_string, runtime_version, functionapp_version, is_linux)
+        else:
+            runtime_helper = _FlexFunctionAppStackRuntimeHelper(cmd, location, runtime_string, runtime_version)
+            matched_runtime = runtime_helper.resolve(runtime_string, runtime_version)
     except ValidationError as e:
         if "Invalid version" in e.error_msg:
             index = e.error_msg.index("Run 'az functionapp list-runtimes' for more details on supported runtimes.")
@@ -7841,6 +7881,7 @@ def _get_functionapp_runtime_version(cmd, runtime_string, runtime_version, funct
             error_message += e.error_msg[index:].lower()
             raise ValidationError(error_message)
         raise e
+    
     if not matched_runtime:
         return None
     if matched_runtime.github_actions_properties:
